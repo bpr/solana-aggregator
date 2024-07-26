@@ -18,6 +18,33 @@ via the `getBlock` method. After experimentation with the `getBlocks` method, I 
 
 Having a means to get a continuous feed of recent blocks, I decided that I would store all of those blocks "as is" to be read by the RESTful API. After examining  a few Rust based alternatives, I decided to use [NanoDB](https://crates.io/crates/nanodb) which provides a simple layer for accessing JSON data, which I obviously have access to given Serde. An attacker who has access to the machines upon which the data is stored will be able to easily see the data, as the DB files are human readable JSON. I decided to ignore this problem in the interests of time.
 
+## Evaluation Criteria
+**Evaluation Criteria:**
+
+- **Functionality:** Does the data aggregator retrieve and process Solana blockchain data accurately and efficiently?
+
+The aggregator is inaccurate in that I introduced a **lag** so that I could use the `slotSubscibe` WebSocket interface. I was able to get the unstable `blockSubscribe` to work on QuickNode instances, but it didn't work with Solana or Helius devnets, so I abandoned that approach. Another approach would have been to just use the RPC calls, as I described in an email. It might be worth reconsidering for a production version.
+
+- **Performance:** How well does the application handle large volumes of data and concurrent requests?
+
+The application is probably much slower than it needs to be. If I were designing it for speed, I'd have the REST API entirely specified, and design the application to make those calls fast. For example, if I expected a lot of calls to get transactions or blocks by date, I'd date shard the database. I'd also consider storing the database in a RAM cache, like Redis. If we're interested in recent data, that suggests we could expire data to keep the cache from becoming enormous.
+
+- **Reliability:** Is the data aggregator resilient to failures and capable of recovering gracefully?
+
+There are still `unwrap` calls in the code that I haven't removed that are potential sources of runtime panics. I'll remove them when I have the time.
+
+- **Scalability:** Can the application scale to handle increasing data loads without sacrificing performance?
+
+As mentioned in the **Performance** section, I'd do a few things differently for performance.
+
+- **Security:** Are proper security measures implemented to protect data integrity?
+
+No. I assume right now that I'm running in a secure environment. I didn't, for example, encrypt the database. 
+
+- **Documentation and Maintainability:** Is the codebase well-documented, well-composed, maintainable, and easy to understand for future developers?
+
+The codebase should be very easy to understand. Each piece is simple, one piece simply gets data from Solana, the other is a REST API that only uses GET methods.
+
 ## Installation
 
 ```bash
@@ -25,20 +52,85 @@ cargo install solana-block-cacher
 ```
 
 ## Usage
-To use Solana Block Cacher, run the command with the desired arguments. Below are the available options:
+To run the aggregator, run the command with the desired arguments. Below are the available options:
 ```bash
-solana-block-cacher [OPTIONS]
+cargo run --bin aggregator -- --rpc-url https://api.devnet.solana.com --ws-url wss://api.devnet.solana.com
 ```
 
-### Getting an RPC URL
-You can get a Solana RPC Url through [QuickNode](https://www.quicknode.com?tap_a=67226-09396e&tap_s=4369813-07359f&utm_source=affiliate&utm_campaign=generic&utm_content=affiliate_landing_page&utm_medium=generic). 
-I personally use the QuickNode Pro solution which allows me to retrieve millions of blocks a month for back testing.
+To run the rest server, run the command with the desired arguments. Below are the available options:
+```bash
+cargo run --bin rest_server -- --rpc-url https://api.devnet.solana.com
+```
+
+Remember to run the rest server *after* the aggregator is running, and to ensure that the DB file of the rest_server is the same as the output file of the aggregator.
+
+To call the rest server, here are some examples with the current API.
+
+```
+curl 'http://localhost:3000/nblocks'
+curl 'http://localhost:3000/block/12'
+curl 'http://localhost:3000/transactions/?day=25/07/2024'
+curl 'http://localhost:3000/transactions/?id=3giGDPLTP6mHDMDc21SPd71FnSKc5KRZKtx58tS95yMUoTVJeRKzzDrG2eE6ZhAjWaVEan7TjnYurntPVq53kkjR'
+```
 
 ### Options
-- `-v, --verbose`: Enables verbose logging (default: false).
-- `-o, --output_file <OUTPUT_FILE>`: The file to write the blocks to (default: "blocks.json").
-- `--rate_limit <RATE_LIMIT>`: The rate limit for the cacher (default: 50 (QuickNode Pro Default)).
-- `-w, --window <WINDOW>`: The time window for the rate limit in seconds (default: 1 (QuickNode Pro Default)).
+
+For the aggregator
+Usage: aggregator [OPTIONS]
+
+Options:
+-  `-v, --verbose`
+          Displays debug logs from the application and dependencies
+
+-      `--lag <LAG>`
+          The number of slots lagged from first slot to first getBlock(slot)
+                    
+          [default: 48]
+
+-      `--rpc-url <RPC_URL>`
+          The HTTP RPC URL for connecting to the Solana DevNet
+          
+          [default: ]
+
+-      `--ws-url <WS_URL>`
+          The WebSocket URL for connecting to the Solana DevNet.
+          
+          [default: ]
+
+-      `--output-file <OUTPUT_FILE>`
+          The output file to write the blocks collected to, for NanoDB.
+          
+          [default: solana_blocks.json]
+
+-      `--rate-limit <RATE_LIMIT>`
+          The rate limit imposed on the cacher to prevent 429's on RPC.
+          
+          TODO: Implement rate limiting
+          
+          [default: 4]
+
+-  `-h, --help`
+          Print help (see a summary with '-h')
+
+-  `-V, --version`
+          Print version
+
+For the rest_server
+Usage: rest_server [OPTIONS]
+
+Options:
+-  -v, --verbose
+          Displays debug logs from the application and dependencies
+      --server-address <SERVER_ADDRESS>
+          The REST API endpoint for this server [default: 127.0.0.1:3000]
+      --rpc-url <RPC_URL>
+          The HTTP RPC URL for connecting to the Solana DevNet [default: ]
+      --db-file <DB_FILE>
+          The output file to read the blocks collected from the blockchain [default: solana_blocks.json]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 
 ### Example
 

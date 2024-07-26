@@ -10,10 +10,15 @@ use axum::{
     // Json,
     Router,
 };
+use chrono::DateTime;
 use clap::{arg, Parser};
 use nanodb::{error::NanoDBError, nanodb::NanoDB};
+use solana_transaction_status::EncodedConfirmedBlock;
 use std::collections::HashMap;
 use tokio::net::TcpListener;
+use utilities::txn_utils::contains_signature;
+
+const SEC_PER_DAY: i64 = 86400;
 
 pub struct MyNanoDBError(NanoDBError);
 
@@ -24,26 +29,22 @@ impl From<NanoDBError> for MyNanoDBError {
 }
 
 impl IntoResponse for MyNanoDBError {
-        fn into_response(self) -> Response {
-        let body = "something went wrong";
-/*
+    fn into_response(self) -> Response {
         use NanoDBError::*;
-        match self.0 {
-            DeserializeFromStr(Error) => "Failed to deserialize from string",
-            Io(Error) => "I/O error",
-            RwLockReadError(String) => "Read error on RwLock",
-            RwLockWriteError(String),
-            NotAnArray(String),
-            LenNotDefined(String),
-            NotAnObject(String),
-            KeyNotFound(String),
-            IndexOutOfBounds(usize),
-            InvalidJSONPath,
-            TypeMismatch(String),
-            DefaultError,
-    } 
- */
-        // its often easiest to implement `IntoResponse` by calling other implementations
+        let body = match self.0 {
+            DeserializeFromStr(_e) => format!("Failed to deserialize from string"),
+            Io(_e) => format!("I/O error"),
+            RwLockReadError(_s) => format!("Read error on RwLock"),
+            RwLockWriteError(_s) => format!("Write error on RwLock"),
+            NotAnArray(_s) => format!("Not an array"),
+            LenNotDefined(_s) => format!("Length not defined"),
+            NotAnObject(_s) => format!("Not an object"),
+            KeyNotFound(_s) => format!("Key not found"),
+            IndexOutOfBounds(_u) => format!("Index out of bounds"),
+            InvalidJSONPath => format!("Invalid JSON path"),
+            TypeMismatch(s) => format!("Type mismatch: {}", s),
+            DefaultError => format!("Default error"),
+        };
         body.into_response()
     }
 }
@@ -55,7 +56,7 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 
-    /// The HTTP RPC URL for connecting to the Solana DevNet.
+    /// The REST API endpoint for this server.
     #[arg(long, default_value = "127.0.0.1:3000")]
     server_address: String,
 
@@ -71,9 +72,9 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let rpc_url = args.rpc_url.clone();
+    let _rpc_url = args.rpc_url.clone();
     let server_address = args.server_address.clone();
-    let mut db = NanoDB::open(&args.db_file)?;
+    let db = NanoDB::open(&args.db_file)?;
 
     // Create the TCP listener
     let listener = TcpListener::bind(&server_address)
@@ -94,25 +95,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[debug_handler]
 async fn get_nblocks(
     State(db): State<NanoDB>,
 ) -> Result<String, MyNanoDBError> {
-    let number = db.data().await.get("nblocks")?.into::<u64>()?;
-    Ok(number.to_string())
+    let number = db.data().await.get("nblocks")?.into::<String>()?;
+    Ok(number)
 }
 
-#[debug_handler]
 async fn get_block(
     State(db): State<NanoDB>,
     Path(index): Path<u64>,
 ) -> Result<String, MyNanoDBError> {
     let key = db.data().await.get(&format!("key_{}", index))?.into::<String>()?;
-    let block = db.data().await.get(&key)?.into::<u64>()?;
-    Ok(block.to_string())
+    let block: EncodedConfirmedBlock = db.data().await.get(&key)?.into()?;
+    Ok(serde_json::to_string(&block).unwrap())
 }
 
-#[debug_handler]
 async fn get_transactions(
     State(db): State<NanoDB>,
     Query(params): Query<HashMap<String, String>>
@@ -120,14 +118,40 @@ async fn get_transactions(
     let mut transactions: Vec<String> = Vec::new();
     for (key, value) in &params {
         if key == "id" {
-            ();
+            let nblocks_string = db.data().await.get("nblocks")?.into::<String>()?;
+            let nblocks = nblocks_string.parse::<u64>().unwrap();
+            for i in 1..=nblocks {
+                let key = db.data().await.get(&format!("key_{}", i))?.into::<String>()?;
+                let block = db.data().await.get(&key)?.into::<EncodedConfirmedBlock>()?;
+                for tx in &block.transactions {
+                    if contains_signature(&tx, &value) {
+                        transactions.push(serde_json::to_string(&tx).unwrap());
+                    }
+                }
+            }
         } else if key == "day" {
-            ();
+            let date_string = format!("{value} 00:00:00 +0000");
+            let dt = DateTime::parse_from_str(&date_string, "%d/%m/%Y %H:%M:%S %z").unwrap();
+            let lo = dt.timestamp();
+            let hi = lo + SEC_PER_DAY;
+            let nblocks_string = db.data().await.get("nblocks")?.into::<String>()?;
+            let nblocks = nblocks_string.parse::<u64>().unwrap();
+            for i in 1..=nblocks {
+                let key = db.data().await.get(&format!("key_{}", i))?.into::<String>()?;
+                let block = db.data().await.get(&key)?.into::<EncodedConfirmedBlock>()?;
+                if let Some(block_time) = block.block_time {
+                    if block_time >= lo && block_time < hi {
+                        for tx in &block.transactions {
+                            transactions.push(serde_json::to_string(&tx).unwrap());
+                        }
+                    }
+                }
+            }
         } else {
             return Err(NanoDBError::KeyNotFound(key.to_string()).into());
         }
     }
-    Ok("".to_string())
+    Ok(transactions.join("\n"))
 }
 
 #[debug_handler]

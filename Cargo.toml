@@ -8,7 +8,7 @@ name = "aggregator"
 path = "src/aggregator.rs"
 
 [[bin]]
-name = "rest-server"
+name = "rest_server"
 path = "src/rest_server.rs"
 
 [dependencies]
@@ -19,10 +19,6 @@ futures-util = "0.3.30"
 nanodb = "0.4.5"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.120"
-solana-account-decoder = "2.0.2"
 solana-client = "2.0.2"
-solana-program = "2.0.3"
-solana-sdk = "2.0.2"
 solana-transaction-status = "2.0.3"
 tokio = "1.38.0"
-url = { version = "2.5.2", features = ["serde"] }

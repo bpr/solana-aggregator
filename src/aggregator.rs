@@ -16,9 +16,8 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 
-    /// The path to the logging output file.
-    ///
-    /// Defaults to "output.log" in relative path to executable
+    /// The number of slots lagged from first slot to first calock(slot).
+
     #[arg(long, default_value = "48")]
     lag: u32,
 
@@ -30,7 +29,7 @@ struct Args {
     #[arg(long, default_value = "")]
     ws_url: String,
 
-    /// The output file to write the blocks collected to
+    /// The output file to write the blocks collected to, for NanoDB
     #[arg(long, default_value = "solana_blocks.json")]
     output_file: String,
 

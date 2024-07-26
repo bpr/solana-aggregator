@@ -1,34 +1,6 @@
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use solana_sdk::sysvar::recent_blockhashes;
-use solana_transaction_status::{
-    EncodedConfirmedBlock, EncodedTransaction, EncodedTransactionWithStatusMeta, UiMessage, UiParsedMessage, UiRawMessage, UiTransaction
-};
+use solana_transaction_status::{ EncodedTransaction, EncodedTransactionWithStatusMeta, UiMessage };
 
-use std::str::FromStr;
-
-
-#[derive(Debug, serde::Deserialize)]
-pub struct ReducedTransaction {
-    pub signatures: Vec<String>,
-    pub recent_blockhash: String,
-    pub account_keys: Vec<String>,
-}
-
-impl ReducedTransaction {
-    pub fn new(
-        signatures: Vec<String>,
-        recent_blockhash: String,
-        account_keys: Vec<String>,
-    ) -> Self {
-        Self {
-            signatures,
-            recent_blockhash,
-            account_keys,
-        }
-    }
-}
-
+#[allow(dead_code)]
 pub fn reduce_transaction(tx: &EncodedTransactionWithStatusMeta) -> (Vec<String>, String, Vec<String>) {
     match &tx.transaction {
         EncodedTransaction::Json(transaction) => {
@@ -63,12 +35,14 @@ pub fn reduce_transaction(tx: &EncodedTransactionWithStatusMeta) -> (Vec<String>
     }
 }
 
-pub fn get_transactions(block: &EncodedConfirmedBlock) -> Vec<ReducedTransaction> {
-    let mut transactions = Vec::new();
-    for tx in &block.transactions {
-        let (signatures, recent_blockhashes, account_keys) = reduce_transaction(tx);
-        transactions.push(ReducedTransaction::new(signatures, recent_blockhashes, account_keys));
+#[allow(dead_code)]
+pub fn contains_signature(txn: &EncodedTransactionWithStatusMeta, signature: &str) -> bool {
+    match &txn.transaction {
+        EncodedTransaction::Json(transaction) =>
+            transaction.signatures.iter().any(|sig| sig == signature),
+        EncodedTransaction::Accounts(transaction) =>
+            transaction.signatures.iter().any(|sig| sig == signature),
+        _ => false
     }
-    transactions
 }
 

@@ -2,7 +2,6 @@ mod utilities;
 
 // use solana_program::pubkey::Pubkey;
 use axum::{
-    debug_handler,
     extract::{Path, Query, State},
     // http::StatusCode,
     response::{IntoResponse, Response},
@@ -13,9 +12,12 @@ use axum::{
 use chrono::DateTime;
 use clap::{arg, Parser};
 use nanodb::{error::NanoDBError, nanodb::NanoDB};
+use solana_client::rpc_client::RpcClient;
+use solana_program::pubkey::Pubkey;
 use solana_transaction_status::EncodedConfirmedBlock;
 use std::collections::HashMap;
 use tokio::net::TcpListener;
+use tokio::task;
 use utilities::txn_utils::contains_signature;
 
 const SEC_PER_DAY: i64 = 86400;
@@ -69,12 +71,21 @@ struct Args {
     db_file: String,
 }
 
+#[derive(Clone)]
+struct AppState {
+    db_file: String,
+    rpc_url: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let _rpc_url = args.rpc_url.clone();
     let server_address = args.server_address.clone();
-    let db = NanoDB::open(&args.db_file)?;
+
+    let app_state = AppState {
+        db_file: args.db_file.clone(),
+        rpc_url: args.rpc_url.clone(),
+    };
 
     // Create the TCP listener
     let listener = TcpListener::bind(&server_address)
@@ -87,8 +98,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/nblocks", get(get_nblocks))
         .route("/block/:index", get(get_block))
         .route("/transactions/", get(get_transactions))
-        .route("/account/:pubkey", get(get_account_by_key))
-        .with_state(db);
+        // .route("/account/:pubkey", get(get_account_by_key))
+        .with_state(app_state);
     // Serve the application
 
     axum::serve(listener, app).await.expect("Error running the server");
@@ -96,25 +107,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn get_nblocks(
-    State(db): State<NanoDB>,
+    State(state): State<AppState>,
 ) -> Result<String, MyNanoDBError> {
+    let db = NanoDB::open(&state.db_file)?;
     let number = db.data().await.get("nblocks")?.into::<String>()?;
     Ok(number)
 }
 
 async fn get_block(
-    State(db): State<NanoDB>,
+    State(state): State<AppState>,
     Path(index): Path<u64>,
 ) -> Result<String, MyNanoDBError> {
+    let db = NanoDB::open(&state.db_file)?;
     let key = db.data().await.get(&format!("key_{}", index))?.into::<String>()?;
     let block: EncodedConfirmedBlock = db.data().await.get(&key)?.into()?;
     Ok(serde_json::to_string(&block).unwrap())
 }
 
 async fn get_transactions(
-    State(db): State<NanoDB>,
+    State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>
 ) -> Result<String, MyNanoDBError> {
+    let db = NanoDB::open(&state.db_file)?;
     let mut transactions: Vec<String> = Vec::new();
     for (key, value) in &params {
         if key == "id" {
@@ -154,9 +168,15 @@ async fn get_transactions(
     Ok(transactions.join("\n"))
 }
 
-#[debug_handler]
-async fn get_account_by_key(
-        State(_db): State<NanoDB>,
-    ) -> Result<String, MyNanoDBError> {
-    todo!()
-}
+// async fn get_account_by_key(
+//     State(state): State<AppState>,
+//     Path(pubkey): Path<String>,
+//     ) -> Result<String, Box<dyn std::error::Error>> {
+//         let rpc_url = state.rpc_url.clone();
+//         let account = task::spawn_blocking(move || {
+//             // Call potentially costly synchronous code
+//             let pubkey_array: [u8; 32] = pubkey.as_bytes().try_into().unwrap();
+//             RpcClient::new(rpc_url).get_account(&Pubkey::new_from_array(pubkey_array))
+//         }).await?;
+//         Ok(serde_json::to_string(&account).unwrap_or("".to_string()))
+//     }

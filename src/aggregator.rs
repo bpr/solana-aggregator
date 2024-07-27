@@ -55,8 +55,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut accounts, unsubscriber) = ps_client.slot_subscribe().await?;
     let mut db = NanoDB::open(&args.output_file)?;
 
-    let nblocks = db.data().await.get("nblocks")?.into::<String>().unwrap_or("0".to_string());
-    let mut count = nblocks.parse::<i32>().unwrap_or(0) as u32;
+    let nblocks = match db.data().await.get("nblocks") {
+        Ok(nblocks) => nblocks.into::<String>().unwrap_or("0".to_string()),
+        Err(_) => "0".to_string(),
+    };
+    let mut count = nblocks.parse::<u32>().unwrap_or(0);
     let mut deque: VecDeque<SlotInfo> = VecDeque::with_capacity(lag);
     while let Some(response) = accounts.next().await {
         let rpc_url = rpc_url.clone();

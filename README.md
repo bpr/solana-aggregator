@@ -108,6 +108,10 @@ Options:
           TODO: Implement rate limiting
           
           [default: 4]
+-      `--max_blocks <MAX_BLOCKS>`
+          The maximum number of blocks to read. If 0, unlimited.
+    
+          [default: 16]
 
 -  `-h, --help`
           Print help (see a summary with '-h')

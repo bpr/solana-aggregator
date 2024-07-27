@@ -16,7 +16,7 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 
-    /// The number of slots lagged from first slot to first calock(slot).
+    /// The number of slots lagged from first slot to first getBlock(slot).
 
     #[arg(long, default_value = "48")]
     lag: u32,
@@ -25,11 +25,11 @@ struct Args {
     #[arg(long, default_value = "")]
     rpc_url: String,
 
-    /// The HTTP RPC URL for connecting to the Solana DevNet.
+    /// The WebSocket URL for connecting to the Solana DevNet.
     #[arg(long, default_value = "")]
     ws_url: String,
 
-    /// The output file to write the blocks collected to, for NanoDB
+    /// The output file to write the blocks collected to, for NanoDB.
     #[arg(long, default_value = "solana_blocks.json")]
     output_file: String,
 
@@ -38,6 +38,10 @@ struct Args {
     /// TODO: Implement rate limiting
     #[arg(long, default_value = "4")]
     rate_limit: u32,
+
+    /// The maximum number of blocks to read. If 0, unlimited.
+    #[arg(long, default_value = "16")]
+    max_blocks: u32,
 }
 
 #[tokio::main]
@@ -51,7 +55,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut accounts, unsubscriber) = ps_client.slot_subscribe().await?;
     let mut db = NanoDB::open(&args.output_file)?;
 
-    let mut count = 0;
+    let nblocks = db.data().await.get("nblocks")?.into::<String>().unwrap_or("0".to_string());
+    let mut count = nblocks.parse::<i32>().unwrap_or(0) as u32;
     let mut deque: VecDeque<SlotInfo> = VecDeque::with_capacity(lag);
     while let Some(response) = accounts.next().await {
         let rpc_url = rpc_url.clone();
@@ -86,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => println!("Error: {:?} at slot={slot}", e), // TODO: Log miss at slot#
             };
         };
-        if count >= 16 {
+        if args.max_blocks > 0 && count >= args.max_blocks {
             break;
         }
     }

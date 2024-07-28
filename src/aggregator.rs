@@ -1,7 +1,7 @@
 mod utilities;
 
-use futures_util::StreamExt;
 use clap::{arg, Parser};
+use futures_util::StreamExt;
 use nanodb::nanodb::NanoDB;
 use solana_client::nonblocking::pubsub_client::PubsubClient;
 use solana_client::rpc_client::RpcClient;
@@ -70,7 +70,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let block = task::spawn_blocking(move || {
                 // Call potentially costly synchronous code
                 RpcClient::new(rpc_url).get_block(slot)
-            }).await?;
+            })
+            .await?;
             match block {
                 Ok(block) => {
                     let key = format!("block-{}", slot);
@@ -90,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     db.insert("nblocks", &format!("{count}")).await?;
                     db.insert(&format!("key_{count}"), &key).await?;
                     db.write().await?; // write to file if needed
-                },
+                }
                 Err(e) => println!("Error: {:?} at slot={slot}", e), // TODO: Log miss at slot#
             };
         };
@@ -100,6 +101,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     unsubscriber().await;
- 
+
     Ok(())
 }

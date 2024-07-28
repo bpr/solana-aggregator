@@ -1,4 +1,4 @@
-use solana_transaction_status::{ EncodedTransaction, EncodedTransactionWithStatusMeta, UiMessage };
+use solana_transaction_status::{EncodedTransaction, EncodedTransactionWithStatusMeta, UiMessage};
 
 #[allow(dead_code)]
 pub fn reduce_transaction(tx: &EncodedTransactionWithStatusMeta) -> (Vec<String>, String, Vec<String>) {
@@ -38,11 +38,8 @@ pub fn reduce_transaction(tx: &EncodedTransactionWithStatusMeta) -> (Vec<String>
 #[allow(dead_code)]
 pub fn contains_signature(txn: &EncodedTransactionWithStatusMeta, signature: &str) -> bool {
     match &txn.transaction {
-        EncodedTransaction::Json(transaction) =>
-            transaction.signatures.iter().any(|sig| sig == signature),
-        EncodedTransaction::Accounts(transaction) =>
-            transaction.signatures.iter().any(|sig| sig == signature),
-        _ => false
+        EncodedTransaction::Json(transaction) => transaction.signatures.iter().any(|sig| sig == signature),
+        EncodedTransaction::Accounts(transaction) => transaction.signatures.iter().any(|sig| sig == signature),
+        _ => false,
     }
 }
-

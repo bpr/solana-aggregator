@@ -2,7 +2,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
-Solana Aggregator is a suite of tools built in Rust for the Solforge interview. It is designed to efficiently pull blocks from the Solana blockchain, respecting the specified rate limits. 
+Solana Aggregator is a suite of tools built in Rust. It is designed to efficiently pull blocks from the Solana blockchain, respecting the specified rate limits. 
 
 ## Requirements
 - **Data Retrieval:** Must be able to retrieve transaction and account data from the Solana devnet or testnet, using Solana's API or SDK.
@@ -143,6 +143,7 @@ Options:
 - [ ] Consider a multithreaded design
 - [ ] Implement a solution for retrieveing missed blocks, such as a retry mechanism.
 - [ ] Implement a log based, time sharded database, instead of using NanoDB
+- [ ] Implement in memory DB and/or cache
 
 ## License
 This project is open source and available under MIT.

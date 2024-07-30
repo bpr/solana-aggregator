@@ -125,15 +125,15 @@ Usage: rest_server [OPTIONS]
 Options:
 -  -v, --verbose
           Displays debug logs from the application and dependencies
-      --server-address <SERVER_ADDRESS>
+-      --server-address <SERVER_ADDRESS>
           The REST API endpoint for this server [default: 127.0.0.1:3000]
-      --rpc-url <RPC_URL>
+-      --rpc-url <RPC_URL>
           The HTTP RPC URL for connecting to the Solana DevNet [default: ]
-      --db-file <DB_FILE>
+-      --db-file <DB_FILE>
           The output file to read the blocks collected from the blockchain [default: solana_blocks.json]
-  -h, --help
+-  -h, --help
           Print help
-  -V, --version
+-  -V, --version
           Print version
 
 ### TODO

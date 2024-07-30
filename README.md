@@ -136,7 +136,13 @@ Options:
   -V, --version
           Print version
 
-### Example
+### TODO
+- [ ] Reduce/remove unwrap. Integrate a better error handling system
+- [ ] Include a rate limiting module for the aggregator
+- [ ] Include a logger with the aggregator
+- [ ] Consider a multithreaded design
+- [ ] Implement a solution for retrieveing missed blocks, such as a retry mechanism.
+- [ ] Implement a log based, time sharded database, instead of using NanoDB
 
 ## License
 This project is open source and available under MIT.
